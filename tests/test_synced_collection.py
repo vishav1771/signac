@@ -37,7 +37,10 @@ class TestSyncedCollectionBase():
 class TestJSONDict(TestSyncedCollectionBase):
 
     def get_synced_dict(self, data=None):
-        return JSONDict(filename=self._fn_dict, data=data)
+        dt = JSONDict(filename=self._fn_dict, data=data)
+        if data is not None:
+            dt.sync()
+        return dt
 
     def test_init(self):
         self.get_synced_dict()
@@ -175,6 +178,35 @@ class TestJSONDict(TestSyncedCollectionBase):
         assert key in copy
         assert copy[key] == d
 
+    def test_buffered_read_write(self):
+        jsd = self.get_synced_dict()
+        jsd2 = self.get_synced_dict()
+        assert jsd == jsd2
+        key = 'buffered_read_write'
+        d = self.get_testdata()
+        d2 = self.get_testdata()
+        assert len(jsd) == 0
+        assert len(jsd2) == 0
+        with jsd.buffered() as b:
+            b[key] = d
+            assert b[key] == d
+            assert len(b) == 1
+            assert len(jsd2) == 0
+        assert len(jsd) == 1
+        assert len(jsd2) == 1
+        with jsd2.buffered() as b2:
+            b2[key] = d2
+            assert len(jsd) == 1
+            assert len(b2) == 1
+            assert jsd[key] == d
+            assert b2[key] == d2
+        assert jsd[key] == d2
+        assert jsd2[key] == d2
+        with jsd.buffered() as b:
+            del b[key]
+            assert key not in b
+        assert key not in jsd
+
     def test_write_invalid_type(self):
         class Foo(object):
             pass
@@ -222,7 +254,10 @@ class TestJSONDict(TestSyncedCollectionBase):
 class TestJSONList(TestSyncedCollectionBase):
 
     def get_synced_list(self, data=None):
-        return JSONList(filename=self._fn_dict, data=data)
+        ls = JSONList(filename=self._fn_dict, data=data)
+        if data is not None:
+            ls.sync()
+        return ls
 
     def test_init(self):
         self.get_synced_list()
@@ -301,6 +336,34 @@ class TestJSONList(TestSyncedCollectionBase):
         del sl
         assert copy[0] == d
 
+    def test_buffered_read_write(self):
+        jsl = self.get_synced_list()
+        jsl2 = self.get_synced_list()
+        assert jsl == jsl2
+        d = self.get_testdata()
+        d2 = self.get_testdata()
+        assert len(jsl) == 0
+        assert len(jsl2) == 0
+        with jsl.buffered() as b:
+            b.append(d)
+            assert b[0] == d
+            assert len(b) == 1
+            assert len(jsl2) == 0
+        assert len(jsl) == 1
+        assert len(jsl2) == 1
+        with jsl2.buffered() as b2:
+            b2[0] = d2
+            assert len(jsl) == 1
+            assert len(b2) == 1
+            assert jsl[0] == d
+            assert b2[0] == d2
+        assert jsl[0] == d2
+        assert jsl2[0] == d2
+        with jsl.buffered() as b:
+            del b[0]
+            assert len(b) == 0
+        assert len(jsl) == 0
+
 
 class TestNestedDict(TestJSONDict, TestJSONList):
 
@@ -313,7 +376,8 @@ class TestNestedDict(TestJSONDict, TestJSONList):
         assert isinstance(child1, type(child2))
 
     def test_nested_list(self):
-        sl = self.get_synced_list([1, 2, 3])
+        sl = self.get_synced_list()
+        sl.extend([1, 2, 3])
         sl.append([2, 4])
         child1 = sl[3]
         child1.append([1])
