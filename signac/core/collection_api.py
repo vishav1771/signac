@@ -68,6 +68,7 @@ _SYNCED_DATA = dict()
 _FILEMETA = dict()
 
 
+# TODO: uuid hash
 class BufferException(Error):
     """An exception occured in buffered mode."""
 
