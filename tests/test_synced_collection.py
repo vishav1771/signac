@@ -8,6 +8,7 @@ import json
 from tempfile import TemporaryDirectory
 from collections.abc import MutableMapping
 from collections.abc import MutableSequence
+from hypothesis import given, strategies as st
 
 from signac.core.synced_collection import SyncedCollection
 from signac.core.jsoncollection import JSONDict
@@ -59,9 +60,9 @@ class TestJSONDict(TestSyncedCollectionBase):
         assert isinstance(sd, MutableMapping)
         assert isinstance(sd, JSONDict)
 
-    def test_set_get(self, synced_collection, testdata):
+    @given(key=st.text(alphabet=st.characters(blacklist_characters='.')))
+    def test_set_get(self, synced_collection, testdata, key):
         sd = synced_collection
-        key = 'setget'
         d = testdata
         sd.clear()
         assert not bool(sd)
