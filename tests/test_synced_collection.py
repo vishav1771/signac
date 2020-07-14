@@ -24,6 +24,9 @@ FN_JSON = 'test.json'
 def testdata():
     return str(uuid.uuid4())
 
+# https://github.com/glotzerlab/signac/compare/feature/hypothesis
+# https://github.com/glotzerlab/coxeter
+
 
 class TestSyncedCollectionBase():
 
