@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from collections.abc import MutableMapping
 from collections.abc import MutableSequence
 from hypothesis import given, strategies as st
+from string import printable
 
 from signac.core.synced_collection import SyncedCollection
 from signac.core.jsoncollection import JSONDict
@@ -17,40 +18,56 @@ from signac.errors import InvalidKeyError
 from signac.errors import KeyTypeError
 
 
-FN_JSON = 'test.json'
-
-
 @pytest.fixture
 def testdata():
     return str(uuid.uuid4())
 
+
 # https://github.com/glotzerlab/signac/compare/feature/hypothesis
 # https://github.com/glotzerlab/coxeter
+
+
+PRINTABLE_NO_DOTS = printable.replace('.', ' ')
+
+JSON_Data = st.recursive(
+    st.none() | st.booleans() | st.floats(allow_nan=False) | st.text(printable),
+    lambda children: st.lists(children, 2) | st.dictionaries(
+        st.text(PRINTABLE_NO_DOTS), children, min_size=1),  max_leaves=20)
+
+JSON_List = st.iterables(JSON_Data)
 
 
 class TestSyncedCollectionBase():
 
     _type = None
     _write_concern = False
+    FN_JSON = 'test_json_dict.json'
+    _tmp_dir = None
 
-    @pytest.fixture
+    @pytest.fixture(scope='class', autouse=True)
     def synced_collection(self):
-        self._tmp_dir = TemporaryDirectory(prefix='jsondict_')
-        self._fn_ = os.path.join(self._tmp_dir.name, FN_JSON)
-        if self._type is not None:
-            yield self._type(filename=self._fn_, write_concern=self._write_concern)
+        cls = type(self)
+        cls._tmp_dir = TemporaryDirectory(prefix='jsondict_')
+        cls._fn_ = os.path.join(cls._tmp_dir.name, cls.FN_JSON)
+        print(cls.__dict__['_fn_'])
+        if cls._type is not None:
+            yield cls._type(filename=cls._fn_, write_concern=cls._write_concern)
         else:
             yield
-        self._tmp_dir.cleanup()
+        cls._tmp_dir.cleanup()
 
     def test_init(self, synced_collection):
         if synced_collection:
             assert len(synced_collection)
+        print(self._tmp_dir)
+        assert 0 == 1
 
     def test_invalid_kwargs(self):
         if self._type is not None:
             with pytest.raises(ValueError):
                 return self._type()
+
+    # def excute_example(self):
 
 
 class TestJSONDict(TestSyncedCollectionBase):
@@ -63,10 +80,9 @@ class TestJSONDict(TestSyncedCollectionBase):
         assert isinstance(sd, MutableMapping)
         assert isinstance(sd, JSONDict)
 
-    @given(key=st.text(alphabet=st.characters(blacklist_characters='.')))
-    def test_set_get(self, synced_collection, testdata, key):
+    @given(key=st.text(PRINTABLE_NO_DOTS), d=JSON_Data)
+    def test_set_get(self, synced_collection, key, d):
         sd = synced_collection
-        d = testdata
         sd.clear()
         assert not bool(sd)
         assert len(sd) == 0
@@ -336,6 +352,7 @@ class TestJSONDict(TestSyncedCollectionBase):
 class TestJSONList(TestSyncedCollectionBase):
 
     _type = JSONList
+    FN_JSON = 'test_json_list.json'
 
     def test_isinstance(self, synced_collection):
         sl = synced_collection
