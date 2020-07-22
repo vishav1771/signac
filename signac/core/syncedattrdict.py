@@ -34,7 +34,8 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
         dictionary representation, and if necessary construct a new SyncedAttrDict.
     """
 
-    _PROTECTED_KEYS = ('_data', '_suspend_sync_', '_load', '_sync', '_parent')
+    _PROTECTED_KEYS = ('_data', '_suspend_sync_', '_load',
+                       '_sync', '_parent', '_id', 'backend_kwargs')
 
     VALID_KEY_TYPES = (str, int, bool, type(None))
 
@@ -48,7 +49,6 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
                     self._validate_key(key): self.from_base(data=value, parent=self)
                     for key, value in data.items()
                 }
-            self.sync()
 
     def to_base(self):
         """Convert the SyncedDict object to Dictionary.
@@ -58,6 +58,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
         converted: dict
             Dictionary containing the converted synced dict object.
         """
+        self.load()
         converted = {}
         for key, value in self._data.items():
             if isinstance(value, SyncedCollection):
@@ -234,3 +235,6 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
 
 class BufferedSyncedAttrDict(BufferedSyncedCollection, SyncedAttrDict):
     pass
+
+
+SyncedCollection.register(BufferedSyncedAttrDict)

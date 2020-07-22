@@ -34,7 +34,7 @@ _BUFFERED_MODE = 0
 _BUFFERED_MODE_FORCE_WRITE = None
 _BUFFER_SIZE = None
 _BUFFER = dict()
-_SYNCED_DATA = dict()
+_BACKEND_DATA = dict()
 _FILEMETA = dict()
 
 
@@ -70,7 +70,7 @@ def _get_filemetadata(filename):
             raise
 
 
-def _store_in_buffer(filename, blob, synced_data=False):
+def _store_in_buffer(id, blob, backend_kwargs, metadata=None, synced_data=False):
     assert _BUFFERED_MODE > 0
     blob_size = sys.getsizeof(blob)
     buffer_load = get_buffer_load()
@@ -80,11 +80,10 @@ def _store_in_buffer(filename, blob, synced_data=False):
         elif blob_size + buffer_load > _BUFFER_SIZE:
             logger.debug("Buffer overflow, flushing...")
             flush_all()
-    _BUFFER[filename] = blob
-    _SYNCED_DATA[filename] = synced_data
-    if synced_data:
-        if not _BUFFERED_MODE_FORCE_WRITE:
-            _FILEMETA[filename] = _get_filemetadata(filename)
+    _BUFFER[id] = blob
+    _BACKEND_DATA[id] = (backend_kwargs, synced_data)
+    if not _BUFFERED_MODE_FORCE_WRITE:
+        _FILEMETA[id] = metadata
     return True
 
 
@@ -93,18 +92,20 @@ def flush_all():
     logger.debug("Flushing buffer...")
     issues = dict()
     while _BUFFER:
-        filename, blob = _BUFFER.popitem()
+        id, blob = _BUFFER.popitem()
+        backend_kwargs, synced_data = _BACKEND_DATA.pop(id)
         if not _BUFFERED_MODE_FORCE_WRITE:
-            meta = _FILEMETA.pop(filename)
-            if _get_filemetadata(filename) != meta:
-                issues[filename] = 'File appears to have been externally modified.'
+            meta = _FILEMETA.pop(id)
+            obj = SyncedCollection.from_base(data=blob, suspend_sync=True, **backend_kwargs)
+            if obj._get_metadata() != meta:
+                issues[id] = 'File appears to have been externally modified.'
                 continue
-        if not _SYNCED_DATA.pop(filename):
+        if not synced_data:
             try:
-                SyncedCollection.from_base(filename=filename, data=blob).sync()
+                obj._sync(data=blob)
             except OSError as error:
                 logger.error(str(error))
-                issues[filename] = error
+                issues[id] = error
     if issues:
         raise BufferedFileError(issues)
 
@@ -177,7 +178,7 @@ def buffer_reads_writes(buffer_size=DEFAULT_BUFFER_SIZE, force_write=False):
                 flush_all()
             finally:
                 assert not _BUFFER
-                assert not _SYNCED_DATA
+                assert not _BACKEND_DATA
                 assert not _FILEMETA
                 _BUFFER_SIZE = None
                 _BUFFERED_MODE_FORCE_WRITE = None
@@ -197,6 +198,8 @@ class SyncedCollection(Collection):
         self._data = None
         self._parent = parent
         self._suspend_sync_ = 0
+        self._id = None
+        self.backend_kwargs = {}
 
     @classmethod
     def register(cls, *args):
@@ -268,18 +271,22 @@ class SyncedCollection(Collection):
         pass
 
     @abstractmethod
-    def _sync(self):
+    def _sync(self, data=None):
         """Write data to file."""
         pass
 
     def sync(self):
         """Synchronize the data with the underlying backend."""
         if self._suspend_sync_ <= 0:
-            if self._filename is not None:
-                data = self.to_base()
-                if _BUFFERED_MODE > 0:  # Storing in buffer
-                    _store_in_buffer(self._filename, data)
-                else:   # Saving to disk:
+            if self._parent is None:
+                with self._suspend_sync():
+                    data = self.to_base()
+                if _BUFFERED_MODE > 0:
+                    # Storing in buffer
+                    _store_in_buffer(
+                        self._id, data, self.backend_kwargs, metadata=self._get_metadata())
+                else:
+                    # Saving to disk:
                     self._sync(data)
             else:
                 self._parent.sync()
@@ -287,19 +294,22 @@ class SyncedCollection(Collection):
     def load(self):
         """Load the data from the underlying backend."""
         if self._suspend_sync_ <= 0:
-            if self._filename is not None:
+            if self._parent is None:
                 if _BUFFERED_MODE > 0:
-                    if self._filename in _BUFFER:
+                    if self._id in _BUFFER:
                         # Load from buffer:
-                        blob = _BUFFER[self._filename]
+                        blob = _BUFFER[self._id]
                     else:
                         # Load from disk and store in buffer
                         blob = self._load()
-                        _store_in_buffer(self._filename, blob, synced_data=True)
+
+                        _store_in_buffer(self._id, blob, self.backend_kwargs,
+                                         metadata=self._get_metadata(), synced_data=True)
                 else:
                     # Just load from disk
                     blob = self._load()
-                    # Reset the instance
+                # Reset the instance
+                with self._suspend_sync():
                     self._update(blob)
             else:
                 self._parent.load()
@@ -309,6 +319,9 @@ class SyncedCollection(Collection):
         buffered_collection = self.from_base(data=self, backend='buffered', parent=self)
         yield buffered_collection
         buffered_collection.flush()
+
+    def _get_metadata(self):
+        return None
 
     # defining common methods
     def __getitem__(self, key):

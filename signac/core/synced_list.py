@@ -44,7 +44,6 @@ class SyncedList(SyncedCollection, MutableSequence):
                 data = data.tolist()
             with self._suspend_sync():
                 self._data = [self.from_base(data=value, parent=self) for value in data]
-            self.sync()
 
     @classmethod
     def is_base_type(cls, data):
@@ -74,6 +73,7 @@ class SyncedList(SyncedCollection, MutableSequence):
         converted: list
             List containing the conveted SyncedList object.
         """
+        self.load()
         converted = list()
         for value in self._data:
             if isinstance(value, SyncedCollection):
@@ -183,3 +183,6 @@ class SyncedList(SyncedCollection, MutableSequence):
 
 class BufferedSyncedList(BufferedSyncedCollection, SyncedList):
     pass
+
+
+SyncedCollection.register(BufferedSyncedList)
