@@ -304,6 +304,12 @@ class SyncedCollection(Collection):
             else:
                 self._parent.load()
 
+    @contextmanager
+    def buffered(self):
+        buffered_collection = self.from_base(data=self, backend='buffered', parent=self)
+        yield buffered_collection
+        buffered_collection.flush()
+
     # defining common methods
     def __getitem__(self, key):
         self.load()
@@ -336,3 +342,24 @@ class SyncedCollection(Collection):
 
     def __str__(self):
         return str(self._data)
+
+
+class BufferedSyncedCollection(SyncedCollection):
+
+    backend = 'buffered'
+
+    def load(self):
+        pass
+
+    def sync(self):
+        pass
+
+    def _load(self):
+        pass
+
+    def _sync(self):
+        pass
+
+    def flush(self):
+        """Save buffered changes to the underlying file."""
+        self._parent._sync(self.to_base())
