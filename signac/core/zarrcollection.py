@@ -6,9 +6,9 @@
 This implements the Redis-backend for SyncedCollection API by
 implementing sync and load methods.
 """
-import json
-import redis
+import zarr
 import uuid
+import numcodecs
 
 from .synced_collection import SyncedCollection
 from .syncedattrdict import SyncedAttrDict
@@ -20,17 +20,14 @@ def get_namespace(class_name):
     return uuid.uuid5(uuid.NAMESPACE_URL, 'signac::'+class_name)
 
 
-class RedisCollection(SyncedCollection):
+class ZarrCollection(SyncedCollection):
     """Implement sync and load using a Redis backend."""
 
     backend = __name__  # type: ignore
 
-    def __init__(self, name=None, client=None, redis_kwargs=None, **kwargs):
-        if client is None:
-            redis_kwargs = redis_kwargs if redis_kwargs is not None else {}
-            self._client = redis.Redis(**redis_kwargs)
-        else:
-            self._client = None
+    def __init__(self, name=None, store=None, redis_kwargs=None, **kwargs):
+        self._root = zarr.group(store=store)
+        self._name = name
         self._id = None if name is None else uuid.uuid5(get_namespace(type(self).__name__), name)
         super().__init__(**kwargs)
         if (name is None) == (self._parent is None):
@@ -40,19 +37,23 @@ class RedisCollection(SyncedCollection):
 
     def _load(self):
         """Load the data from a Radis-database."""
-        blob = self._client.get(self._id)
-        return json.loads(blob) if blob is not None else blob
+        try:
+            dataset = self._root[self._name]
+            data = dataset[0]
+        except KeyError:
+            data = None
+        return data
 
     def _sync(self):
         """Write the data from Radis-database."""
         data = self.to_base()
         # Serialize data:
-        blob = json.dumps(data).encode()
+        dataset = self._root.require_dataset(
+            self._name, overwrite=True, shape=1, dtype='object', object_codec=numcodecs.JSON())
+        dataset[0] = data
 
-        self._client.set(self._id, blob)
 
-
-class RedisDict(RedisCollection, SyncedAttrDict):
+class ZarrDict(ZarrCollection, SyncedAttrDict):
     """A dict-like mapping interface to a persistent Redis-database.
 
     The RedisDict inherits from :class:`~core.collection_api.RedisCollection`
@@ -87,21 +88,20 @@ class RedisDict(RedisCollection, SyncedAttrDict):
     Parameters
     ----------
     name: str, optional
-        The name of the  collection (Default value = None).
-    client:
-    redis_kwargs: dict
-
+        The name of the  (Default value = None).
     data: mapping, optional
-        The intial data pass to RedisDict. Defaults to `list()`
+        The intial data pass to JSONDict. Defaults to `list()`
     parent: object, optional
-        A parent instance of RedisDict or None (Default value = None).
-
+        A parent instance of JSONDict or None (Default value = None).
+    write_concern: bool, optional
+        Ensure file consistency by writing changes back to a temporary file
+        first, before replacing the original file (Default value = None).
     """
 
     pass
 
 
-class RedisList(RedisCollection, SyncedList):
+class ZarrList(ZarrCollection, SyncedList):
     """A non-string sequence interface to a persistent JSON file.
 
     The JSONDict inherits from :class:`~core.collection_api.SyncedCollection`
@@ -127,19 +127,18 @@ class RedisList(RedisCollection, SyncedList):
 
     Parameters
     ----------
-    name: str, optional
-        The name of the  collection (Default value = None).
-    client:
-    redis_kwargs: dict
-
-    data: mapping, optional
-        The intial data pass to RedisDict. Defaults to `list()`
-    parent: object, optional
-        A parent instance of RedisDict or None (Default value = None).
-
+    filename: str
+        The filename of the associated JSON file on disk (Default value = None).
+    data: non-str Sequence
+        The intial data pass to ZarrDict
+    parent: object
+        A parent instance of ZarrDict or None (Default value = None).
+    write_concern: bool
+        Ensure file consistency by writing changes back to a temporary file
+        first, before replacing the original file (Default value = None).
     """
 
     pass
 
 
-SyncedCollection.register(RedisDict, RedisList)
+SyncedCollection.register(ZarrDict, ZarrList)
