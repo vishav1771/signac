@@ -1,7 +1,13 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""SyncedAttrDict."""
+"""Implements the SyncedAttrDict class.
+
+This implements the dict data-structure for SyncedCollection API by
+implementing the convert methods (`to_base`, `from_base`) for dictionaries.
+This class also allows access to values through key indexing or attributes
+named by keys, including nested keys.
+"""
 
 from collections.abc import Mapping
 from collections.abc import MutableMapping
@@ -12,7 +18,7 @@ from ..errors import KeyTypeError
 
 
 class SyncedAttrDict(SyncedCollection, MutableMapping):
-    """Implements the dict data structures.
+    """Implement the dict data structure along with values access through attributes named as keys.
 
     The SyncedAttrDict inherits from :class:`~core.collection_api.SyncedCollection`
     and :class:`~collections.abc.MutableMapping`. Therefore, it behaves similar to
@@ -23,7 +29,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
 
         While the SyncedAttrDict object behaves like a dictionary, there are
         important distinctions to remember. In particular, because operations
-        are reflected as changes to an underlying file, copying (even deep
+        are reflected as changes to an underlying backend, copying (even deep
         copying) a SyncedAttrDict instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
         dictionary representation, and if necessary construct a new SyncedAttrDict.
@@ -46,12 +52,13 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
             self.sync()
 
     def to_base(self):
-        """Converts the SyncedDict object to Dictionary.
+        """Convert the SyncedDict object to Dictionary.
 
         Returns:
         --------
         converted: dict
-            Dictionary containing the converted synced dict object."""
+            Dictionary containing the converted synced dict object.
+        """
         converted = {}
         for key, value in self._data.items():
             if isinstance(value, SyncedCollection):
@@ -62,7 +69,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
 
     @classmethod
     def is_base_type(cls, data):
-        """Checks whether the data is an instance of mapping.
+        """Check whether the data is an instance of mapping.
 
         Parameters
         ----------
@@ -78,11 +85,12 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
         return False
 
     def _update(self, data=None):
-        """Updates the SyncedDict instance with data by using dfs."""
+        """Update the SyncedDict instance with data using depth-first traversal."""
         if data is None:
             data = {}
         if isinstance(data, Mapping):
             with self._suspend_sync():
+                # This loop avoids rebuilding existing synced collections for performance.
                 for key in data:
                     if key in self._data:
                         if data[key] == self._data[key]:
@@ -93,7 +101,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
                                 continue
                             except ValueError:
                                 pass
-                    self._data[self._validate_key(key)] = self.from_base(data[key])
+                    self._data[self._validate_key(key)] = self.from_base(data[key], parent=self)
                 remove = set()
                 for key in self._data:
                     if key not in data:
@@ -106,7 +114,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
 
     @staticmethod
     def _validate_key(key):
-        "Emit a warning or raise an exception if key is invalid. Returns key."
+        """Raise an exception if key is invalid. Returns key."""
         if isinstance(key, SyncedAttrDict.VALID_KEY_TYPES):
             key = str(key)
             if '.' in key:
@@ -139,6 +147,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
         """
         if data is None:
             data = {}
+
         if isinstance(data, Mapping):
             self.load()
             with self._suspend_sync():

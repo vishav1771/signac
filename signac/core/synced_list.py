@@ -1,7 +1,11 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""SyncedList."""
+"""Implements the SyncedList class.
+
+This implements the list data-structure for SyncedCollection API by
+implementing the convert methods (`to_base`, `from_base`) for lists.
+"""
 
 from collections.abc import Sequence
 from collections.abc import MutableSequence
@@ -24,7 +28,7 @@ class SyncedList(SyncedCollection, MutableSequence):
 
         While the SyncedList object behaves like a dictionary, there are
         important distinctions to remember. In particular, because operations
-        are reflected as changes to an underlying file, copying (even deep
+        are reflected as changes to an underlying backend, copying (even deep
         copying) a SyncedList instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
         dictionary representation, and if necessary construct a new SyncedList.
@@ -78,17 +82,19 @@ class SyncedList(SyncedCollection, MutableSequence):
         return converted
 
     def _update(self, data=None):
-        """Update the instance of SyncedList with data by using dfs."""
+        """Update the instance of SyncedList with data using depth-first traversal."""
         if data is None:
             data = []
         if isinstance(data, Sequence) and not isinstance(data, str):
             with self._suspend_sync():
+                # This loop avoids rebuilding existing synced collections for performance.
+                # TODO: Potential improvements to this code: Remove order constraints.
                 for i in range(min(len(self), len(data))):
                     if data[i] == self._data[i]:
                         continue
                     if isinstance(self._data[i], SyncedCollection):
                         try:
-                            self._data[i]._update(i)
+                            self._data[i]._update(data[i])
                             continue
                         except ValueError:
                             pass
@@ -117,6 +123,8 @@ class SyncedList(SyncedCollection, MutableSequence):
         """
         if data is None:
             data = []
+        if NUMPY and isinstance(data, numpy.ndarray):
+            data = data.tolist()
         if isinstance(data, Sequence) and not isinstance(data, str):
             with self._suspend_sync():
                 self._data = [self.from_base(data=value, parent=self) for value in data]

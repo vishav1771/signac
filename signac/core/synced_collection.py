@@ -1,11 +1,16 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Synced Collection."""
+"""Implement the SyncedCollection class.
+
+SyncedCollection encapsulates the synchronization of different data-structures.
+These features are implemented in different subclasses which enable us to use a
+backend with different data-structures or vice-versa. It declares as abstract
+methods the methods that must be implemented by any subclass to match the API.
+"""
 
 from contextlib import contextmanager
 from abc import abstractmethod
-from abc import ABCMeta
 from collections import defaultdict
 from collections.abc import Collection
 
@@ -16,30 +21,12 @@ except ImportError:
     NUMPY = False
 
 
-class SyncedCollectionABCMeta(ABCMeta):
-    """Metaclass for the definition of SyncedCollection.
-
-    This metaclass automatically registers synced data structures' definition,
-    this is used when recursively converting synced data structures to determine.
-    what to convert their children into.
-    """
-
-    def __init__(cls, name, bases, dct):
-        if not hasattr(cls, 'registry'):
-            cls.registry = defaultdict(list)
-        else:
-            if not cls.__abstractmethods__:
-                cls.registry[cls.backend].append(cls)
-        return super().__init__(name, bases, dct)
-
-
-class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
+class SyncedCollection(Collection):
     """The base synced collection represents a collection that is synced with a backend.
 
-    The class is intended for use as an ABC. It declares abstract
-    methods that must be implemented by any subclass. The SyncedCollection is a
-    :class:`~collections.abc.Collection` where all data is stored persistently in
-    the underlying backend.
+    The class is intended for use as an ABC. The SyncedCollection is a
+    :class:`~collections.abc.Collection` where all data is stored persistently
+    in the underlying backend. The backend name wil be same as the module name.
     """
 
     backend = None
@@ -48,6 +35,23 @@ class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
         self._data = None
         self._parent = parent
         self._suspend_sync_ = 0
+
+    @classmethod
+    def register(cls, *args):
+        """Register the synced data structures.
+
+        Registry is used when recursively converting synced data structures to determine
+        what to convert their children into.
+
+        Parameters
+        ----------
+        *args
+            Classes to register
+        """
+        if not hasattr(cls, 'registry'):
+            cls.registry = defaultdict(list)
+        for _cls in args:
+            cls.registry[_cls.backend].append(_cls)
 
     @classmethod
     def from_base(cls, data, backend=None, **kwargs):
@@ -59,7 +63,7 @@ class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
             Data to be converted from base class.
         backend: str
             Name of backend for synchronization. Default to backend of class.
-        kwargs:
+        **kwargs:
             Kwargs passed to instance of synced collection.
 
         Returns
@@ -69,7 +73,7 @@ class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
         """
         backend = cls.backend if backend is None else backend
         if backend is None:
-            raise ValueError("No backend found!!")
+            raise ValueError("No backend found.")
         for _cls in cls.registry[backend]:
             if _cls.is_base_type(data):
                 return _cls(data=data, **kwargs)
@@ -92,18 +96,18 @@ class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
 
     @classmethod
     @abstractmethod
-    def is_base_type(cls):
-        """Check whether data is of same base type as synced data structures."""
+    def is_base_type(cls, data):
+        """Check whether data is of the same base type (such as list or dict) as this class."""
         pass
 
     @abstractmethod
     def _load(self):
-        """Load data from file."""
+        """Load data from underlying backend."""
         pass
 
     @abstractmethod
     def _sync(self):
-        """Write data to file."""
+        """Write data to underlying backend."""
         pass
 
     def sync(self):
@@ -124,7 +128,7 @@ class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
             else:
                 self._parent.load()
 
-    # defining common methods
+    # methods having same implementaion for all data-structures
     def __getitem__(self, key):
         self.load()
         return self._data[key]
@@ -152,7 +156,9 @@ class SyncedCollection(Collection, metaclass=SyncedCollectionABCMeta):
             return self() == other
 
     def __repr__(self):
+        self.load()
         return repr(self._data)
 
     def __str__(self):
+        self.load()
         return str(self._data)
