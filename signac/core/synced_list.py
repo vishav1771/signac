@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from collections.abc import MutableSequence
 
 from .synced_collection import SyncedCollection
-from .synced_collection import BufferedSyncedCollection
+from .buffered_collection import BufferedCollection
 from .synced_collection import NUMPY
 
 if NUMPY:
@@ -181,7 +181,7 @@ class SyncedList(SyncedCollection, MutableSequence):
         self.sync()
 
 
-class BufferedSyncedList(BufferedSyncedCollection, SyncedList):
+class BufferedSyncedList(BufferedCollection, SyncedList):
     pass
 
 

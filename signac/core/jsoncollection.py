@@ -13,27 +13,34 @@ import errno
 import uuid
 
 from .synced_collection import SyncedCollection
+from .buffered_collection import BufferedSyncedCollection
 from .syncedattrdict import SyncedAttrDict
 from .synced_list import SyncedList
-from .synced_collection import _get_filemetadata
+from .buffered_collection import _get_filemetadata
 
 
-class JSONCollection(SyncedCollection):
+def get_namespace(class_name):
+    """Generate namespace for classname"""
+    return uuid.uuid5(uuid.NAMESPACE_URL, 'signac::'+class_name)
+
+
+class JSONCollection(BufferedSyncedCollection):
     """Implement sync and load using a JSON back end."""
 
     backend = 'JSON'  # type: ignore
 
-    def __init__(self, filename=None, write_concern=False, suspend_sync=False, **kwargs):
+    def __init__(self, filename=None, data=None, write_concern=False, no_sync=False, **kwargs):
+        kwargs['data'] = data
         super().__init__(**kwargs)
-        self.backend_kwargs['filename'] = None if filename is None else os.path.realpath(filename)
-        self.backend_kwargs['write_concern'] = write_concern
-        self.backend_kwargs['backend'] = self.backend
-        self._id = self.backend_kwargs['filename']
         if (filename is None) == (self._parent is None):
             raise ValueError(
                 "Illegal argument combination, one of the two arguments, "
                 "parent or filename must be None, but not both.")
-        if not suspend_sync:
+        self.backend_kwargs['filename'] = None if filename is None else os.path.realpath(filename)
+        self.backend_kwargs['write_concern'] = write_concern
+        self.backend_kwargs['backend'] = self.backend
+        self._id = uuid.uuid5(get_namespace(type(self).__name__), self.backend_kwargs['filename'])
+        if not no_sync and data is not None:
             self.sync()
 
     def _load(self):

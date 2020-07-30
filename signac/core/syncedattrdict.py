@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from collections.abc import MutableMapping
 
 from .synced_collection import SyncedCollection
-from .synced_collection import BufferedSyncedCollection
+from .buffered_collection import BufferedCollection
 from ..errors import InvalidKeyError
 from ..errors import KeyTypeError
 
@@ -233,7 +233,7 @@ class SyncedAttrDict(SyncedCollection, MutableMapping):
             self.__delitem__(key)
 
 
-class BufferedSyncedAttrDict(BufferedSyncedCollection, SyncedAttrDict):
+class BufferedSyncedAttrDict(BufferedCollection, SyncedAttrDict):
     pass
 
 
