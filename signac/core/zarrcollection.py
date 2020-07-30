@@ -1,9 +1,9 @@
 # Copyright (c) 2020 The Regents of the University of Michigan
 # All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-"""Implements Redis-backend.
+"""Implements Zarr-backend.
 
-This implements the Redis-backend for SyncedCollection API by
+This implements the Zarr-backend for SyncedCollection API by
 implementing sync and load methods.
 """
 import zarr
@@ -21,11 +21,11 @@ def get_namespace(class_name):
 
 
 class ZarrCollection(SyncedCollection):
-    """Implement sync and load using a Redis backend."""
+    """Implement sync and load using a Zarr backend."""
 
     backend = __name__  # type: ignore
 
-    def __init__(self, name=None, store=None, redis_kwargs=None, **kwargs):
+    def __init__(self, name=None, store=None, **kwargs):
         self._root = zarr.group(store=store)
         self._name = name
         self._id = None if name is None else uuid.uuid5(get_namespace(type(self).__name__), name)
@@ -54,14 +54,14 @@ class ZarrCollection(SyncedCollection):
 
 
 class ZarrDict(ZarrCollection, SyncedAttrDict):
-    """A dict-like mapping interface to a persistent Redis-database.
+    """A dict-like mapping interface to a persistent Zarr-database.
 
-    The RedisDict inherits from :class:`~core.collection_api.RedisCollection`
+    The ZarrDict inherits from :class:`~core.collection_api.ZarrCollection`
     and :class:`~core.syncedattrdict.SyncedAttrDict`.
 
     .. code-block:: python
 
-        doc = RedisDict('data.json', write_concern=True)
+        doc = ZarrDict('data.json', write_concern=True)
         doc['foo'] = "bar"
         assert doc.foo == doc['foo'] == "bar"
         assert 'foo' in doc
@@ -77,13 +77,13 @@ class ZarrDict(ZarrCollection, SyncedAttrDict):
 
     .. warning::
 
-        While the RedisDict object behaves like a dictionary, there are
+        While the ZarrDict object behaves like a dictionary, there are
         important distinctions to remember. In particular, because operations
         are reflected as changes to an underlying database, copying (even deep
-        copying) a RedisDict instance may exhibit unexpected behavior. If a
+        copying) a ZarrDict instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
         dictionary representation, and if necessary construct a new JSONDict
-        instance: `new_dict = RedisDict(old_dict.to_base())`.
+        instance: `new_dict = ZarrDict(old_dict.to_base())`.
 
     Parameters
     ----------
@@ -122,8 +122,8 @@ class ZarrList(ZarrCollection, SyncedList):
         are reflected as changes to an underlying database, copying (even deep
         copying) a JSONList instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
-        dictionary representation, and if necessary construct a new RedisList
-        instance: `new_list = RedisList(old_list.to_base())`.
+        dictionary representation, and if necessary construct a new ZarrList
+        instance: `new_list = ZarrList(old_list.to_base())`.
 
     Parameters
     ----------

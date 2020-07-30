@@ -12,6 +12,8 @@ from collections.abc import MutableSequence
 from signac.core.synced_list import SyncedCollection
 from signac.core.jsoncollection import JSONDict
 from signac.core.jsoncollection import JSONList
+from signac.core.zarrcollection import ZarrDict
+from signac.core.zarrcollection import ZarrList
 from signac.errors import InvalidKeyError
 from signac.errors import KeyTypeError
 
@@ -22,6 +24,12 @@ except ImportError:
     NUMPY = False
 
 FN_JSON = 'test.json'
+
+try:
+    import zarr
+    Zarr = True
+except ImportError:
+    Zarr = False
 
 
 @pytest.fixture
@@ -301,8 +309,7 @@ class TestJSONDict():
 
         # invalid data
         data = [1, 2, 3]
-        with open(self._fn_, 'wb') as file:
-            file.write(json.dumps(data).encode())
+        self.store(data)
         with pytest.raises(ValueError):
             synced_dict.load()
 
@@ -594,3 +601,39 @@ class TestJSONListWriteConcern(TestJSONList):
 class TestJSONDictWriteConcern(TestJSONDict):
 
     _write_concern = True
+
+
+class TestZarrDict(TestJSONDict):
+
+    @pytest.fixture(autouse=True)
+    def synced_dict(self):
+        self._tmp_dir = TemporaryDirectory(prefix='jsondict_')
+        self._store = zarr.DirectoryStore(self._tmp_dir.name)
+        self._backend_kwargs = {'name': 'test', 'store': self._store}
+        self._cls = ZarrDict
+        yield ZarrDict(**self._backend_kwargs)
+        self._tmp_dir.cleanup()
+
+    def store(self, data):
+        if isinstance(data, dict):
+            ZarrDict(data=data, **self._backend_kwargs)
+        elif isinstance(data, list):
+            ZarrList(data=data, **self._backend_kwargs)
+
+
+class TestZarrList(TestJSONList):
+
+    @pytest.fixture(autouse=True)
+    def synced_list(self):
+        self._tmp_dir = TemporaryDirectory(prefix='jsondict_')
+        self._store = zarr.DirectoryStore(self._tmp_dir.name)
+        self._backend_kwargs = {'name': 'test', 'store': self._store}
+        self._cls = ZarrList
+        yield ZarrList(**self._backend_kwargs)
+        self._tmp_dir.cleanup()
+
+    def store(self, data):
+        if isinstance(data, dict):
+            ZarrDict(data=data, **self._backend_kwargs)
+        elif isinstance(data, list):
+            ZarrList(data=data, **self._backend_kwargs)
