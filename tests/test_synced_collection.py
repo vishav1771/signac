@@ -603,6 +603,7 @@ class TestJSONDictWriteConcern(TestJSONDict):
     _write_concern = True
 
 
+@pytest.mark.skipif(not Zarr, reason='test requires the zarr package')
 class TestZarrDict(TestJSONDict):
 
     @pytest.fixture(autouse=True)
@@ -621,6 +622,7 @@ class TestZarrDict(TestJSONDict):
             ZarrList(data=data, **self._backend_kwargs)
 
 
+@pytest.mark.skipif(not Zarr, reason='test requires the zarr package')
 class TestZarrList(TestJSONList):
 
     @pytest.fixture(autouse=True)
