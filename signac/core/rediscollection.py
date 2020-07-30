@@ -60,7 +60,7 @@ class RedisDict(RedisCollection, SyncedAttrDict):
 
     .. code-block:: python
 
-        doc = RedisDict('data.json', write_concern=True)
+        doc = RedisDict('data')
         doc['foo'] = "bar"
         assert doc.foo == doc['foo'] == "bar"
         assert 'foo' in doc
@@ -81,20 +81,22 @@ class RedisDict(RedisCollection, SyncedAttrDict):
         are reflected as changes to an underlying database, copying (even deep
         copying) a RedisDict instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
-        dictionary representation, and if necessary construct a new JSONDict
+        dictionary representation, and if necessary construct a new RedisDict
         instance: `new_dict = RedisDict(old_dict.to_base())`.
 
     Parameters
     ----------
-    name: str, optional
+    name: str
         The name of the  collection (Default value = None).
     client:
+        A redis client.
     redis_kwargs: dict
-
+        kwargs arguments passed through to the `redis.Redis` function.
     data: mapping, optional
         The intial data pass to RedisDict. Defaults to `list()`
     parent: object, optional
         A parent instance of RedisDict or None (Default value = None).
+
 
     """
 
@@ -102,14 +104,14 @@ class RedisDict(RedisCollection, SyncedAttrDict):
 
 
 class RedisList(RedisCollection, SyncedList):
-    """A non-string sequence interface to a persistent JSON file.
+    """A non-string sequence interface to a persistent Redis file.
 
-    The JSONDict inherits from :class:`~core.collection_api.SyncedCollection`
+    The RedisDict inherits from :class:`~core.collection_api.SyncedCollection`
     and :class:`~core.syncedlist.SyncedList`.
 
     .. code-block:: python
 
-        doc = JSONList('data.json', write_concern=True)
+        doc = RedisList('data')
         doc.append("bar")
         assert doc[0] == "bar"
         assert len(doc) == 1
@@ -117,21 +119,22 @@ class RedisList(RedisCollection, SyncedList):
 
     .. warning::
 
-        While the JSONList object behaves like a list, there are
+        While the RedisList object behaves like a list, there are
         important distinctions to remember. In particular, because operations
         are reflected as changes to an underlying database, copying (even deep
-        copying) a JSONList instance may exhibit unexpected behavior. If a
+        copying) a RedisList instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
         dictionary representation, and if necessary construct a new RedisList
         instance: `new_list = RedisList(old_list.to_base())`.
 
     Parameters
     ----------
-    name: str, optional
+    name: str
         The name of the  collection (Default value = None).
     client:
+        A redis client.
     redis_kwargs: dict
-
+        kwargs arguments passed through to the `redis.Redis` function.
     data: mapping, optional
         The intial data pass to RedisDict. Defaults to `list()`
     parent: object, optional

@@ -61,7 +61,7 @@ class ZarrDict(ZarrCollection, SyncedAttrDict):
 
     .. code-block:: python
 
-        doc = ZarrDict('data.json', write_concern=True)
+        doc = ZarrDict('data')
         doc['foo'] = "bar"
         assert doc.foo == doc['foo'] == "bar"
         assert 'foo' in doc
@@ -82,60 +82,58 @@ class ZarrDict(ZarrCollection, SyncedAttrDict):
         are reflected as changes to an underlying database, copying (even deep
         copying) a ZarrDict instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
-        dictionary representation, and if necessary construct a new JSONDict
+        dictionary representation, and if necessary construct a new ZarrDict
         instance: `new_dict = ZarrDict(old_dict.to_base())`.
 
     Parameters
     ----------
     name: str, optional
-        The name of the  (Default value = None).
+        The name of the  collection (Default value = None).
     data: mapping, optional
-        The intial data pass to JSONDict. Defaults to `list()`
+        The intial data pass to ZarrDict. Defaults to `list()`.
+    store: mapping
+        A zarr store to synchronise the data
     parent: object, optional
-        A parent instance of JSONDict or None (Default value = None).
-    write_concern: bool, optional
-        Ensure file consistency by writing changes back to a temporary file
-        first, before replacing the original file (Default value = None).
+        A parent instance of ZarrDict or None (Default value = None).
     """
 
     pass
 
 
 class ZarrList(ZarrCollection, SyncedList):
-    """A non-string sequence interface to a persistent JSON file.
+    """A non-string sequence interface to a persistent Zarr file.
 
-    The JSONDict inherits from :class:`~core.collection_api.SyncedCollection`
+    The ZarrDict inherits from :class:`~core.collection_api.ZarrCollection`
     and :class:`~core.syncedlist.SyncedList`.
 
     .. code-block:: python
 
-        doc = JSONList('data.json', write_concern=True)
-        doc.append("bar")
-        assert doc[0] == "bar"
-        assert len(doc) == 1
-        del doc[0]
+        synced_list = ZarrList('data')
+        synced_list.append("bar")
+        assert synced_list[0] == "bar"
+        assert len(synced_list) == 1
+        del synced_list[0]
 
     .. warning::
 
-        While the JSONList object behaves like a list, there are
+        While the ZarrList object behaves like a list, there are
         important distinctions to remember. In particular, because operations
         are reflected as changes to an underlying database, copying (even deep
-        copying) a JSONList instance may exhibit unexpected behavior. If a
+        copying) a ZarrList instance may exhibit unexpected behavior. If a
         true copy is required, you should use the `to_base()` method to get a
         dictionary representation, and if necessary construct a new ZarrList
         instance: `new_list = ZarrList(old_list.to_base())`.
 
     Parameters
     ----------
-    filename: str
-        The filename of the associated JSON file on disk (Default value = None).
-    data: non-str Sequence
-        The intial data pass to ZarrDict
-    parent: object
+    name: str
+        The name of the  collection.
+    data: mapping, optional
+        The intial data pass to ZarrDict. Defaults to `list()`.
+    store: mapping
+        A zarr store to synchronise the data
+    parent: object, optional
         A parent instance of ZarrDict or None (Default value = None).
-    write_concern: bool
-        Ensure file consistency by writing changes back to a temporary file
-        first, before replacing the original file (Default value = None).
     """
 
     pass
